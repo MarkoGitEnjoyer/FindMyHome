@@ -1,0 +1,296 @@
+﻿@page "/ThreadContent/{threadId:int}"
+@inject IJSRuntime JSRuntime
+@using Microsoft.JSInterop
+@using System.Text.Json
+@using Data.Models
+@inject NavigationManager Navigation
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="./HomeStyle.css">
+    <title>Thread Content</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow-y:auto;
+        }
+
+        .previous-post {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-top: 10px;
+            padding: 15px;
+            background-color: #f9f9f9;
+        }
+
+        .previous-post-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+
+        .previous-post-author {
+            font-weight: bold;
+        }
+
+        .previous-post-date {
+            color: #777;
+            font-size: 0.9em;
+        }
+
+        .previous-post-content {
+            margin-top: 5px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 80px auto;
+            padding: 50px;
+            background-color: #fff;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .user-picture-container {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            overflow: hidden;
+            margin-right: 10px;
+        }
+
+        /* Add this style to the image to make it fit inside the circular container */
+        .user-picture {
+            width: 100%;
+            height: auto;
+        }
+        .post {
+            border-bottom: 1px solid #ddd;
+            padding: 20px 0;
+            position: relative; /* Added position relative for button positioning */
+        }
+
+            .post:last-child {
+                border-bottom: none;
+            }
+
+        .post-content {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .post-details {
+            font-size: 14px;
+            color: #666;
+        }
+
+        /* Added style for reply form */
+        .reply-form {
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+        }
+
+            .reply-form textarea {
+                resize: vertical;
+                min-height: 100px;
+                margin-bottom: 10px;
+            }
+
+            .reply-form button[type="submit"],
+            button.reply-button,
+            button.post-button {
+                padding: 10px 20px;
+                font-size: 16px;
+                border: none;
+                border-radius: 5px;
+                cursor: pointer;
+                transition: background-color 0.3s ease;
+            }
+
+                .reply-form button[type="submit"]:hover,
+                button.reply-button:hover,
+                button.post-button:hover {
+                    background-color: #007bff;
+                    color: #fff;
+                }
+
+                .reply-form button[type="submit"]:focus,
+                button.reply-button:focus,
+                button.post-button:focus {
+                    outline: none;
+                }
+
+            .reply-form button[type="submit"] {
+                align-self: flex-end;
+            }
+    </style>
+</head>
+<body style="margin: 0; padding: 0; overflow: hidden;">
+    <header style="position: fixed; top: 0; width: 100%; background: #fff; z-index: 999;">
+        <nav id='pn_menu'>
+            <div class="logo">
+                <a href="/">
+                    <h2>HOME</h2>
+                </a>
+            </div>
+            <div id="head-mobile"></div>
+            <div class="button"></div>
+            <ul class="main_menu">
+                <li class='active'><a href='/Categories'>Forum</a></li>
+                <li>
+                    <a href='/AllAnimals'>All Animals</a>
+
+                </li>
+                <li><a href='/UserEdit'>My Account</a></li>
+            </ul>
+        </nav>
+    </header>
+    <div class="container">
+        <h1>Thread Content</h1>
+        @if (posts != null && posts.Any())
+        {
+            @foreach (var post in posts)
+            {
+                <div class="post @(post.post_replyuser.HasValue ? "reply" : "")">
+                    <!-- Display the user's picture in a circular container -->
+                    @if (post.user != null && post.user.user_picture != null && post.user.user_picture.Length > 0)
+                    {
+                        <div class="user-picture-container">
+                            <img class="user-picture" src="data:image;base64,@Convert.ToBase64String(post.user.user_picture)" alt="User Picture" />
+                        </div>
+                    }
+                    <div class="post-content-details">
+                        <div class="post-content">@post.post_content</div>
+                        <div class="post-details">
+                            <span>Posted on @post.post_creationdate.ToShortDateString()</span>
+                            @if (post.user != null)
+                            {
+                                <span> by @post.user.user_fullname</span>
+                            }
+                        </div>
+                    </div>
+                    @if (post.post_replyuser.HasValue)
+                    {
+                        <div class="previous-post">
+                            <div class="previous-post-header">
+                                <span class="previous-post-author">@post.post.user.user_fullname</span>
+                                <span class="previous-post-date">@post.post.post_creationdate.ToShortDateString()</span>
+                            </div>
+                            <div class="previous-post-content">@post.post.post_content</div>
+                        </div>
+                    }
+                    <button class="reply-button" @onclick="() => Reply(post.post_id)">Reply</button>
+                    @if (showReplyForm && post.post_id == replyToPostId)
+                    {
+                        <form class="reply-form" @onsubmit="() => PostReply(post.post_id)">
+                            <textarea @bind="replyContent"></textarea>
+                            <button type="submit" class="post-button">Post Reply</button>
+                        </form>
+                    }
+                </div>
+            }
+        }
+
+        else
+        {
+            <p>No posts found.</p>
+        }
+        @if (showPostForm)
+        {
+            <form class="reply-form" @onsubmit="CreatePost">
+                <textarea @bind="newPostContent"></textarea>
+                <button type="submit" class="post-button">Post</button>
+            </form>
+        }
+    </div>
+
+</body>
+</html>
+
+ @code {
+        [Parameter]
+        public int threadId { get; set; }
+        ApiServices e = new ApiServices();
+        List<Post> posts;
+        private User storedUser;
+        private string newPostContent = "";
+        private bool showReplyForm = false;
+        private int replyToPostId;
+        private string replyContent = "";
+        private bool showPostForm = true;
+        protected override async Task OnInitializedAsync()
+        {
+            posts = await e.GetListPostsByThreadIdAsync(threadId);
+            var userJson = await JSRuntime.InvokeAsync<string>("sessionStorage.getItem", "user");
+        if (userJson == null)
+        {
+            Navigation.NavigateTo("/Login");
+            return;
+        }
+            storedUser = JsonSerializer.Deserialize<User>(userJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        }
+
+        private async Task CreatePost()
+        {
+            if (!string.IsNullOrWhiteSpace(newPostContent))
+            {
+                Post newPost = new Post
+                {
+                    post_content = newPostContent,
+                    post_creationdate = DateTime.Now,
+                    thread_id = threadId,
+                    user_id = storedUser.user_id
+                };
+
+                await e.CreatePost(newPost);
+
+                newPostContent = "";
+
+                posts = await e.GetListPostsByThreadIdAsync(threadId);
+            }
+        }
+
+        private void Reply(int postId)
+        {
+            showReplyForm = true;
+            showPostForm = false;
+            replyToPostId = postId;
+        }
+
+        private async Task PostReply(int postId)
+        {
+            if (!string.IsNullOrWhiteSpace(replyContent))
+            {
+                Post newReply = new Post
+                {
+                    post_content = replyContent,
+                    post_creationdate = DateTime.Now,
+                    thread_id = threadId,
+                    user_id = storedUser.user_id,
+                    post_replyuser = postId
+                };
+
+                await e.CreatePost(newReply);
+
+                replyContent = "";
+                showReplyForm = false;
+                replyToPostId = 0;
+
+                posts = await e.GetListPostsByThreadIdAsync(threadId);
+            }
+            showPostForm = true;
+        }
+    }

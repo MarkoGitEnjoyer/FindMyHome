@@ -1,0 +1,309 @@
+﻿@page "/AllAnimals"
+@inject IJSRuntime JSRuntime
+@using Microsoft.JSInterop
+@using System.Text.Json
+@using Data.Models
+@inject NavigationManager Navigation
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>All Animals</title>
+    <link rel="stylesheet" href="./AnimalModalStyle.css">
+    <link rel="stylesheet" href="./HomeStyle.css">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        .animal-card-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .animal-card {
+            display: flex;
+            align-items: center;
+            border-radius: 15px;
+            overflow: hidden;
+            transition: transform 0.3s ease;
+            max-width: 1200px;
+            width: 100%;
+        }
+
+            .animal-card:hover {
+                transform: translateY(-5px);
+            }
+
+        .animal-image-container {
+            flex-shrink: 0;
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            overflow: hidden;
+        }
+
+        .animal-image {
+            width: 100%;
+            height: auto;
+        }
+
+        .animal-card-content {
+            flex-grow: 1;
+            padding: 20px;
+            background: linear-gradient(to bottom right, #ff9a9e, #fad0c4);
+            border: 2px solid #fff;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            border-radius: 15px;
+            color: #fff;
+        }
+
+        .animal-card h3 {
+            margin-top: 0;
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+        }
+
+        .animal-card p {
+            margin-bottom: 0;
+        }
+    </style>
+</head>
+<body style="margin: 0; padding: 0; overflow: hidden; background-color:#2fade2;">
+    <header style="position: fixed; top: 0; width: 100%; background: #fff; z-index: 999;">
+        <nav id='pn_menu'>
+            <div class="logo">
+                <a href="/">
+                    <h2>HOME</h2>
+                </a>
+            </div>
+            <div id="head-mobile"></div>
+            <div class="button"></div>
+            <ul class="main_menu">
+                <li class='active'><a href='/Categories'>Forum</a></li>
+                <li>
+                    <a href='/AllAnimals'>All Animals</a>
+
+                </li>
+                <li><a href='/UserEdit'>My Account</a></li>
+            </ul>
+        </nav>
+    </header>
+    <div style=" padding:100px; overflow: hidden;" class="container">
+        <div class="row mb-3">
+            <div class="col">
+                <input type="text" id="searchInput" @bind="searchText" class="form-control" placeholder="Search...">
+            </div>
+            <div class="col">
+                @if (types != null)
+                {
+                    <select id="typeFilter" @bind="selectedType" class="form-control">
+                        <option selected disabled>Pick a type...</option>
+                        @foreach (var type in types)
+                        {
+                            <option value="@type">@type</option>
+                        }
+                    </select>
+                }
+            </div>
+            <div class="col">
+                @if (!string.IsNullOrEmpty(selectedType) && breeds != null)
+                {
+                    <select id="breedFilter" @bind="selectedBreed" class="form-control">
+                        <option selected disabled>Pick a breed...</option>
+                        @foreach (var breed in breeds)
+                        {
+                            <option value="@breed">@breed</option>
+                        }
+                    </select>
+                }
+                else
+                {
+                    <select id="breedFilter" class="form-control" disabled>
+                        <option selected disabled>Pick a type first...</option>
+                    </select>
+                }
+            </div>
+            
+            <div class="col">
+                <button @onclick="ApplyFilters" class="btn btn-primary btn-block">Apply Filters</button>
+            </div>
+            <div class="col">
+                <button @onclick="ResetFilters" class="btn btn-secondary btn-block">Reset Filters</button>
+            </div>
+        </div>
+        <div class="animals-list" id="animalsList">
+            @if (filteredAnimals != null)
+            {
+                @foreach (var animal in filteredAnimals)
+                {
+
+                    <div class="animal-card" @onclick="() => OpenAnimalDetails(animal)">
+                        <div class="animal-image-container">
+                            @if (animal.animal_picture != null && animal.animal_picture.Length > 0)
+                            {
+                                var imageBase64 = $"data:image/jpeg;base64,{Convert.ToBase64String(animal.animal_picture)}";
+                                    <img src="@imageBase64" alt="Animal Image" class="rounded-circle animal-image" />
+                            }
+                        </div>
+                        <div class="animal-card-content">
+                            <h3>@animal.animal_type - @animal.animal_breed</h3>
+                            <p>@animal.animal_description</p>
+                        </div>
+                    </div>
+
+                }
+            }
+        </div>
+    </div>
+    <div class="modal" style="display: @modalDisplay">
+        <div class="modal-content">
+            <span class="close" @onclick="CloseModal">&times;</span>
+            <form>
+                @if (selectedAnimal != null)
+                {
+                    <div class="form-group">
+                        @if (selectedAnimal.animal_picture != null && selectedAnimal.animal_picture.Length > 0)
+                        {
+                            var imageBase64 = $"data:image/jpeg;base64,{Convert.ToBase64String(selectedAnimal.animal_picture)}";
+                            <img src="@imageBase64" alt="Animal Image" class="rounded-circle animal-image" />
+                        }
+                    </div>
+                    <div class="form-group">
+                        <label>Status:</label>
+                        <input type="text" class="form-control" value="@selectedAnimal.animal_status" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label>User Full Name:</label>
+                        <input type="text" class="form-control" value="@selectedAnimal.user?.user_fullname" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label>User Phone:</label>
+                        <input type="text" class="form-control" value="@selectedAnimal.user?.user_phone" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label>Breed:</label>
+                        <input type="text" class="form-control" value="@selectedAnimal.animal_breed" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label>Description:</label>
+                        <textarea class="form-control" readonly>@selectedAnimal.animal_description</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Animal Date:</label>
+                        <input type="text" class="form-control" value="@selectedAnimal.animal_date" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label>Animal Type:</label>
+                        <input type="text" class="form-control" value="@selectedAnimal.animal_type" readonly>
+                    </div>
+                }
+            </form>
+        </div>
+    </div>
+
+</body>
+</html>
+
+@code {
+    List<Animal> animals;
+    List<string> breeds;
+    List<string> types;
+    List<Animal> filteredAnimals = new List<Animal>();
+    string selectedBreed;
+    private string _selectedType;
+    private string modalDisplay = "none";
+    public string selectedType
+    {
+        get => _selectedType;
+        set
+        {
+            if (_selectedType != value)
+            {
+                _selectedType = value;
+                FilterBreedsByType(); 
+            }
+        }
+    }
+    string searchText;
+    User storedUser;
+    ApiServices e = new ApiServices();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var userJson = await JSRuntime.InvokeAsync<string>("sessionStorage.getItem", "user");
+        if (userJson == null)
+        {
+            Navigation.NavigateTo("/Login");
+            return;
+        }
+        storedUser = JsonSerializer.Deserialize<User>(userJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        animals = await e.GetListAnimalsAsync();
+        breeds = await e.GetListBreed();
+        types = await e.GetListType();
+        filteredAnimals = animals; 
+    }
+    async Task FilterBreedsByType()
+    {
+        if (!string.IsNullOrEmpty(selectedType))
+        {
+            breeds = await e.GetListBreedByType(selectedType);
+            StateHasChanged();
+        }
+    }
+    async Task ApplyFilters()
+    {
+        FilterAnimals();
+    }
+
+    async Task ResetFilters()
+    {
+        selectedBreed = null;
+        selectedType = null;
+        searchText = null;
+
+        FilterAnimals();
+    }
+
+    void FilterAnimals()
+    {
+        filteredAnimals = animals;
+
+        if (!string.IsNullOrEmpty(selectedBreed))
+        {
+            filteredAnimals = filteredAnimals.Where(animal => animal.animal_breed.ToLower() == selectedBreed.ToLower()).ToList();
+        }
+
+        if (!string.IsNullOrEmpty(selectedType))
+        {
+                FilterBreedsByType();
+            filteredAnimals = filteredAnimals.Where(animal => animal.animal_type.ToLower() == selectedType.ToLower()).ToList();
+        }
+
+        if (!string.IsNullOrEmpty(searchText))
+        {
+            var searchTextLowerCase = searchText.ToLower();
+            filteredAnimals = filteredAnimals.Where(animal =>
+                animal.animal_breed.ToLower().Contains(searchTextLowerCase) ||
+                animal.animal_type.ToLower().Contains(searchTextLowerCase) ||
+                animal.animal_description.ToLower().Contains(searchTextLowerCase)
+            ).ToList();
+        }
+    }
+    Animal selectedAnimal; 
+    void OpenAnimalDetails(Animal animal)
+    {
+        selectedAnimal = animal;
+        OpenModal(); 
+    }
+    public void OpenModal()
+    {
+        modalDisplay = "block";
+    }
+
+    private void CloseModal()
+    {
+        modalDisplay = "none";
+    }
+}

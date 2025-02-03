@@ -1,0 +1,192 @@
+﻿@page "/Threads/{categoryId:int}"
+@inject IJSRuntime JSRuntime
+@using Microsoft.JSInterop
+@using System.Text.Json
+@using Data.Models
+@inject NavigationManager Navigation
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="./HomeStyle.css">
+    <title>Threads Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 80px auto;
+            padding: 50px;
+            background-color: #ffffff;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .thread {
+            border-bottom: 1px solid #ddd;
+            padding: 20px 0;
+        }
+
+            .thread:last-child {
+                border-bottom: none;
+            }
+
+        .thread-title {
+            font-size: 20px;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .thread-details {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .thread-actions {
+            margin-top: 10px;
+        }
+
+            .thread-actions a {
+                color: #007bff;
+                text-decoration: none;
+                margin-right: 10px;
+            }
+
+                .thread-actions a:hover {
+                    text-decoration: underline;
+                }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            box-sizing: border-box;
+        }
+
+        button[type="submit"] {
+            background-color: #007bff;
+            color: #ffffff;
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+            button[type="submit"]:hover {
+                background-color: #0056b3;
+            }
+    </style>
+</head>
+<body style="margin: 0; padding: 0; overflow: hidden;">
+    <header style="position: fixed; top: 0; width: 100%; background: #fff; z-index: 999;">
+        <nav id='pn_menu'>
+            <div class="logo">
+                <a href="/">
+                    <h2>HOME</h2>
+                </a>
+            </div>
+            <div id="head-mobile"></div>
+            <div class="button"></div>
+            <ul class="main_menu">
+                <li class='active'><a href='/Categories'>Forum</a></li>
+                <li>
+                    <a href='/AllAnimals'>All Animals</a>
+
+                </li>
+                <li><a href='/UserEdit'>My Account</a></li>
+            </ul>
+        </nav>
+    </header>
+    <div class="container">
+        <h1>Threads</h1>
+        @if (threads != null && threads.Any())
+        {
+            @foreach (var thread in threads)
+            {
+                <div class="thread">
+                    <div class="thread-title">
+                        <a href="/ThreadContent/@thread.thread_id">@thread.thread_title</a>
+                    </div>
+                    <div class="thread-details">
+                        <span>Created on @thread.thread_creationdate.ToShortDateString()</span>
+                        @if (thread.user != null)
+                        {
+                            <span> by @thread.user.user_fullname</span>
+                        }
+                    </div>
+                    <div class="thread-actions">
+                        <a href="#">View</a>
+                        <a href="#">Edit</a>
+                        <a href="#">Delete</a>
+                    </div>
+                </div>
+            }
+        }
+        else
+        {
+            <p>No threads found.</p>
+        }
+        <form @onsubmit="CreateThread">
+            <div class="form-group">
+                <label for="threadTitle">Thread Title:</label>
+                <input type="text" id="threadTitle" @bind="newThread.thread_title">
+            </div>
+            <button type="submit">Create Thread</button>
+        </form>
+    </div>
+</body>
+</html>
+@code {
+    [Parameter]
+    public int categoryId { get; set; }
+    ApiServices e = new ApiServices();
+    List<Data.Models.Thread> threads;
+    Data.Models.Thread newThread = new Data.Models.Thread();
+    private User storedUser;
+
+    protected override async Task OnInitializedAsync()
+    {
+        threads = await e.GetListThreadsByIdAsync(categoryId);
+        var userJson = await JSRuntime.InvokeAsync<string>("sessionStorage.getItem", "user");
+        if (userJson == null)
+        {
+            Navigation.NavigateTo("/Login");
+            return;
+        }
+        storedUser = JsonSerializer.Deserialize<User>(userJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+    }
+
+    private async Task CreateThread()
+    {
+        newThread.thread_creationdate = DateTime.Now;
+        newThread.category_id = categoryId;
+        newThread.user_id = storedUser.user_id;
+        e.CreateThread(newThread);
+        StateHasChanged();
+        Navigation.NavigateTo($"/ThreadContent/{newThread.thread_id}");
+    }
+}

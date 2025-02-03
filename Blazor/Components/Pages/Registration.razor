@@ -1,0 +1,120 @@
+﻿@page "/Registration"
+@using Data.Models
+@using Microsoft.Extensions.FileProviders
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>User Registration - Finance Mobile Application-UX/UI Design Screen One</title>
+    <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/5.0.0/normalize.min.css">
+    <link rel='stylesheet' href='https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&amp;display=swap'>
+    <link rel="stylesheet" href="./LoginStyle.css">
+    <style>
+        .email + .email {
+            margin-top: 5px; /* Adjust this value as needed */
+        }
+    </style>
+</head>
+<body>
+    <div class="screen-1">
+        <h3>User Registration</h3>
+
+        <div class="email">
+            <label for="user_fullname">Full Name:</label>
+            <input type="text" id="user_fullname" @bind="user_fullname" />
+        </div>
+
+        <div  class="email">
+            <label for="user_phone">Phone:</label>
+            <div class="sec-2">
+                <ion-icon name="call-outline"></ion-icon>
+                <input type="text" id="user_phone" @bind="user_phone" />
+            </div>
+        </div>
+
+        <div class="password">
+            <label for="user_picture">Profile Picture:</label>
+            <InputFile id="user_picture" OnChange="HandleFileChange" />
+        </div>
+
+      
+
+        <div class="password">
+            <label for="user_password">Password:</label>
+            <div class="sec-2">
+                <ion-icon name="lock-closed-outline"></ion-icon>
+                <input class="pas" type="password" id="user_password" @bind="user_password" placeholder="············" />
+                <ion-icon class="show-hide" id="togglePassword" name="eye-outline"></ion-icon>
+            </div>
+        </div>
+
+        <button class="login" @onclick="RegisterUser">Register</button>
+
+        <div class="footer"><span><a href="/Login">Login</a></span><span>Already have user?</span></div>
+
+        <h1 style="font-size:12px; color:black">@s</h1>
+    </div>
+</body>
+</html>
+
+<script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+<script>
+    $(document).ready(function () {
+        $("#togglePassword").click(function () {
+            var passwordField = $("#user_password");
+            var icon = $("#togglePassword");
+
+            if (passwordField.attr("type") === "password") {
+                passwordField.attr("type", "text");
+                icon.attr("name", "eye-off-outline");
+            } else {
+                passwordField.attr("type", "password");
+                icon.attr("name", "eye-outline");
+            }
+        });
+    });
+</script>
+
+
+@code {
+    private string user_phone;
+    private string user_fullname;
+    private byte[] user_picture;
+    private bool user_isadmin = false;
+    private string user_password;
+    private string s;
+    private async Task HandleFileChange(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            var imageFile = e.File;
+
+            using (var memoryStream = new MemoryStream())
+            {
+                await imageFile.OpenReadStream().CopyToAsync(memoryStream);
+                user_picture = memoryStream.ToArray();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error handling file change: {ex.Message}");
+        }
+    }
+
+    ApiServices e = new ApiServices();
+    private void RegisterUser()
+    {
+        try
+        {
+            User u = new User(user_phone, user_fullname, user_picture, user_isadmin);
+            e.UserRegistration(u, user_password);
+        }
+        catch (Exception ex)
+        {
+            s = $"Error registering user: {ex.Message}";
+        }
+    }
+}

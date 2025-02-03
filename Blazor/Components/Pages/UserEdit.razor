@@ -1,0 +1,170 @@
+﻿@page "/UserEdit"
+@inject IJSRuntime JSRuntime
+@using Data.Models
+@using Microsoft.JSInterop
+@using System.Text.Json
+@inject NavigationManager Navigation
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/ProfileManagementStyle.css">
+    <link rel="stylesheet" href="/HomeStyle.css">
+</head>
+<body style="margin: 0; padding: 0; overflow: hidden;">
+    <header style="position: fixed; top: 0; width: 100%; background: #fff; z-index: 999;">
+        <nav id='pn_menu'>
+            <div class="logo">
+                <a href="/">
+                    <h2>LOGO</h2>
+                    <!--         <img src="images/logo.png" alt="" title="" width="100" /> -->
+                </a>
+            </div>
+            <div id="head-mobile"></div>
+            <div class="button"></div>
+            <ul class="main_menu">
+                <li class='active'><a href='/Categories'>Forum</a></li>
+                <li>
+                    <a href='/AllAnimals'>All Animals</a>
+
+                </li>
+                <li><a href='/UserEdit'>My Account</a></li>
+            </ul>
+        </nav>
+    </header>
+</body>
+<body>
+    @if (storedUser != null)
+    {
+        <div class="container">
+            <div class="profile-header">
+                <h1>Edit Profile</h1>
+            </div>
+
+            <div class="profile-content">
+                <div class="profile-picture">
+                    @if (storedUser.user_picture != null)
+                    {
+                        var imageSrc = $"data:image/jpeg;base64,{Convert.ToBase64String(storedUser.user_picture)}";
+                        <img src="@imageSrc" alt="Profile Picture">
+                    }
+                    else
+                    {
+                        <img src="https://bootdey.com/img/Content/avatar/avatar7.png" alt="Default Profile Picture">
+                    }
+                    <div class="file-upload">
+                        <label for="fileInput" class="file-label" style="cursor: pointer;">
+                            Change Photo
+                            <InputFile id="fileInput" OnChange="HandleFileSelected" style="display: none;" />
+                        </label>
+                    </div>
+                </div>
+
+                <div class="profile-form">
+                    <form>
+                        <div class="form-group">
+                            <label for="fullName">Full Name:</label>
+                            <input type="text" id="fullName" name="fullName" @bind="storedUser.user_fullname">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="Phone">Phone:</label>
+                            <input type="text" id="Phone" name="Phone" @bind="storedUser.user_phone">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="password">Change Password:</label>
+                            <input type="password" id="password1" name="password1" @bind="newPassword1">
+                            <input type="password" id="password2" name="password2" @bind="newPassword2">
+                        </div>
+
+
+                        <div class="form-group">
+                            <button type="button" @onclick="UpdateUserProfile">Save Changes</button>
+                            <button type="button" @onclick="Logout">Logout</button>
+                        </div>
+                        <div class="form-group">
+                            @exception
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    }
+</body>
+</html>
+@code {
+    private User storedUser;
+    string exception = "";
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var userJson = await JSRuntime.InvokeAsync<string>("sessionStorage.getItem", "user");
+            if (userJson == null)
+            {
+                Navigation.NavigateTo("/Login");
+                return;
+            }
+            storedUser = JsonSerializer.Deserialize<User>(userJson);
+            StateHasChanged();
+        }
+    }
+    private string newPassword1;
+    private string newPassword2;
+    private byte[] newProfilePicture;
+    ApiServices e = new ApiServices();
+
+    private async Task UpdateUserProfile()
+    {
+        if (newProfilePicture != null && newProfilePicture.Length > 0)
+        {
+            storedUser.user_picture = newProfilePicture;
+        }
+        if (string.IsNullOrEmpty(newPassword1) && string.IsNullOrEmpty(newPassword2))
+        {
+            await e.UpdateUser(storedUser);
+            storedUser = await e.GetUserAsync(storedUser.user_id);
+            exception = "";
+            StateHasChanged();
+            return;
+        }
+        else if (newPassword1 != newPassword2)
+        {
+            exception = "Passwords doesn't match";
+            return;
+        }
+
+        await e.UpdateUserPassword(storedUser, newPassword1);
+        storedUser = await e.GetUserAsync(storedUser.user_id);
+        StateHasChanged();
+        newPassword1 = "";
+        newPassword2 = "";
+        exception = "";
+
+    }
+    private async Task Logout()
+    {
+        await JSRuntime.InvokeVoidAsync("sessionStorage.removeItem", "user");
+        Navigation.NavigateTo("/Login");
+    }
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            var imageFile = e.File;
+
+            using (var memoryStream = new MemoryStream())
+            {
+                await imageFile.OpenReadStream().CopyToAsync(memoryStream);
+                newProfilePicture = memoryStream.ToArray();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error handling file change: {ex.Message}");
+        }
+    }
+}
